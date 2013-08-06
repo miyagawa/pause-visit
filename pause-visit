@@ -45,7 +45,7 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
         my $size = $change->size;
         for my $line (0..$change->size-1) {
             my $text = $change->text($line);
-            next if $text =~ /^(?:Line-Count|Last-Updated)/;
+            next if $text =~ /^(?:Line-Count|Last-Updated|Written-By)/;
             my($module, $version, $dist) = split /\s+/, $text;
             $dists2pkgs{$dist} ||= {};
             $dists2pkgs{$dist}{$module} = $version;
