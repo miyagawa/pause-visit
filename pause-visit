@@ -80,7 +80,7 @@ sub handle_update {
     my $ext = CPAN::DistnameInfo->new($dist)->extension;
     (my $file = $dist) =~ s/\Q$ext\E$/packages.json/;
 
-    my $metafile = Path::Tiny->new("dists/$file");
+    my $metafile = $outdir->child("dists/$file");
     $metafile->parent->mkpath;
     warn "Writing $metafile\n";
     $metafile->spew(JSON::encode_json({ pathname => $dist, packages => $packages }));
