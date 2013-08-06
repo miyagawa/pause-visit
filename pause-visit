@@ -1,11 +1,9 @@
 #!/usr/bin/env perl
 use strict;
-use CPAN::DistnameInfo;
-use JSON;
-use Path::Tiny;
-use Text::Diff::Parser;
 
 package Checkout;
+use File::pushd;
+
 sub new {
     my($class, $dir) = @_;
     bless { dir => $dir }, $class;
@@ -23,13 +21,30 @@ sub git {
     wantarray ? split(/\n/, $out) : $out;
 }
 
-package main;
+sub git_cd {
+    my($self, $cmd) = @_;
+    my $dir = pushd $self->{dir};
+    system "git $cmd";
+}
 
-my $state = Path::Tiny->new(".rev-state");
+package main;
+use CPAN::DistnameInfo;
+use JSON;
+use Path::Tiny;
+use Text::Diff::Parser;
+use Getopt::Long;
+
+my $outdir = Path::Tiny->cwd;
+GetOptions("outdir|o=s", sub { $outdir = Path::Tiny->new($_[1]) });
+
+$outdir->mkpath;
+
+my $state = $outdir->child(".rev-state");
 $state->touch unless $state->exists;
 
 my $dir = shift or die "Usage: pause-visit PAUSE-git\n";
 my $checkout = Checkout->new($dir);
+$checkout->git_cd("pull origin master");
 
 my $current = $state->slurp || $checkout->initial_commit;
 for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
