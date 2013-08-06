@@ -41,9 +41,15 @@ my $clean = 1;
 END { rmdir $lock if $clean }
 
 my $outdir = Path::Tiny->cwd;
-GetOptions("outdir|o=s", sub { $outdir = Path::Tiny->new($_[1]) });
+my $code;
+GetOptions("outdir|o=s", sub { $outdir = Path::Tiny->new($_[1]) }, "e=s", \$code);
 
 $outdir->mkpath;
+
+if ($code) {
+    $code = eval "sub { $code }";
+    die $@ if $@;
+}
 
 my $state = $outdir->child(".rev-state");
 $state->touch unless $state->exists;
@@ -70,6 +76,7 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
             my($module, $version, $dist) = split /\s+/, $text;
             $dists2pkgs{$dist} ||= {};
             $dists2pkgs{$dist}{$module} = $version;
+            $code->($module, $version, $dist) if $code;
         }
     }
 
