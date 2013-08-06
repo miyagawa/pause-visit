@@ -34,6 +34,12 @@ use Path::Tiny;
 use Text::Diff::Parser;
 use Getopt::Long;
 
+my $lock = Path::Tiny->new(".pause-visit.lock");
+mkdir $lock, 0777 or die "Lock directory ($lock) exists. Other process might be running.\n";
+
+my $clean = 1;
+END { rmdir $lock if $clean }
+
 my $outdir = Path::Tiny->cwd;
 GetOptions("outdir|o=s", sub { $outdir = Path::Tiny->new($_[1]) });
 
