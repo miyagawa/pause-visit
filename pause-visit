@@ -63,7 +63,7 @@ sub handle_update {
     my($dist, $packages) = @_;
 
     my $ext = CPAN::DistnameInfo->new($dist)->extension;
-    (my $file = $dist) =~ s/\Q$ext\E$/json/;
+    (my $file = $dist) =~ s/\Q$ext\E$/packages.json/;
 
     my $metafile = Path::Tiny->new("dists/$file");
     $metafile->parent->mkpath;
