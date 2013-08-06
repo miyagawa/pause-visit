@@ -37,7 +37,7 @@ my $finder = sub {
     warn "Indexing $data->{pathname}\n";
 
     while (my($package, $version) = each %{$data->{packages}}) {
-        my $num = version->new($version)->numify;
+        my $num = eval { version->new($version)->numify };
         try {
             $insert_sth->execute($package, $version, $num, $data->{pathname});
         } catch {

@@ -13,7 +13,7 @@ my $update_sth = $dbh->prepare("UPDATE dist_packages SET pathname = ? WHERE pack
 sub update_record {
     my($package, $version, $pathname) = @_;
     warn "UPDATE: $package $version -> $pathname\n";
-    my $num = version->new($version)->numify;
+    my $num = eval { version->new($version)->numify };
     try {
         $insert_sth->execute($package, $version, $num, $data->{pathname});
     } catch {
