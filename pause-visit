@@ -1,0 +1,72 @@
+#!/usr/bin/env perl
+use strict;
+use CPAN::DistnameInfo;
+use JSON;
+use Path::Tiny;
+use Text::Diff::Parser;
+
+package Checkout;
+sub new {
+    my($class, $dir) = @_;
+    bless { dir => $dir }, $class;
+}
+
+sub initial_commit {
+    my $self = shift;
+    $self->git("rev-list --max-parents=0 HEAD");
+}
+
+sub git {
+    my($self, $cmd) = @_;
+    my $out = `git --git-dir=$self->{dir}/.git --work-tree=. $cmd`;
+    chomp $out;
+    wantarray ? split(/\n/, $out) : $out;
+}
+
+package main;
+
+my $state = Path::Tiny->new(".rev-state");
+$state->touch unless $state->exists;
+
+my $dir = shift or die "Usage: pause-visit PAUSE-git\n";
+my $checkout = Checkout->new($dir);
+
+my $current = $state->slurp || $checkout->initial_commit;
+for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
+    warn "Examining $rev\n";
+    my $diff = $checkout->git("show $rev");
+
+    my $p = Text::Diff::Parser->new(Diff => $diff);
+    my @changes = grep { $_->type eq 'ADD' or $_->type eq 'MODIFY' }
+        $p->changes('b/02packages.details.txt');
+
+    my %dists2pkgs;
+    for my $change (@changes) {
+        my $size = $change->size;
+        for my $line (0..$change->size-1) {
+            my $text = $change->text($line);
+            next if $text =~ /^(?:Line-Count|Last-Updated)/;
+            my($module, $version, $dist) = split /\s+/, $text;
+            $dists2pkgs{$dist} ||= {};
+            $dists2pkgs{$dist}{$module} = $version;
+        }
+    }
+
+    for my $dist (sort keys %dists2pkgs) {
+        handle_update($dist, $dists2pkgs{$dist});
+    }
+
+    $state->spew($rev);
+}
+
+sub handle_update {
+    my($dist, $packages) = @_;
+
+    my $ext = CPAN::DistnameInfo->new($dist)->extension;
+    (my $file = $dist) =~ s/\Q$ext\E$/json/;
+
+    my $metafile = Path::Tiny->new("dists/$file");
+    $metafile->parent->mkpath;
+    warn "Writing $metafile\n";
+    $metafile->spew(JSON::encode_json({ pathname => $dist, packages => $packages }));
+}
