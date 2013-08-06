@@ -58,7 +58,32 @@ my $dir = shift or die "Usage: pause-visit PAUSE-git\n";
 my $checkout = Checkout->new($dir);
 $checkout->git_cd("pull origin master");
 
-my $current = $state->slurp || $checkout->initial_commit;
+my $initial;
+my $current = $state->slurp || do { $initial = 1; $checkout->initial_commit };
+
+if ($initial) {
+    warn "Initial run. Taking snapshot of 2012/03/31...\n";
+    my $text = $checkout->git("show $current:02packages.details.txt");
+    my $in_header = 1;
+
+    my %dists2pkgs;
+    for (split /\n/, $text) {
+        chomp;
+        if (/^$/) {
+            $in_header = 0;
+        } elsif (!$in_header) {
+            my($module, $version, $dist) = split /\s+/, $_;
+            $dists2pkgs{$dist} ||= {};
+            $dists2pkgs{$dist}{$module} = $version;
+        }
+    }
+
+    # NOTE This might have partial distribution information
+    for my $dist (sort keys %dists2pkgs) {
+        handle_update($dist, $dists2pkgs{$dist});
+    }
+}
+
 for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
     warn "Examining $rev\n";
     my $diff = $checkout->git("show $rev");
