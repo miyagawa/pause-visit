@@ -24,15 +24,16 @@ sub git {
 sub git_cd {
     my($self, $cmd) = @_;
     my $dir = pushd $self->{dir};
-    system "git $cmd";
+    my $out = `git $cmd`;
 }
 
 package main;
 use CPAN::DistnameInfo;
 use JSON;
 use Path::Tiny;
-use Text::Diff::Parser;
 use Getopt::Long;
+
+$| = 1; # non-buffering
 
 my $lock = Path::Tiny->new(".pause-visit.lock");
 mkdir $lock, 0777 or die "Lock directory ($lock) exists. Other process might be running.\n";
@@ -88,23 +89,27 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
     warn "Examining $rev\n";
     my $diff = $checkout->git("show $rev");
 
-    my $p = Text::Diff::Parser->new(Diff => $diff);
-    my @changes = grep { $_->type eq 'ADD' or $_->type eq 'MODIFY' }
-        $p->changes('b/02packages.details.txt');
-
     my %dists2pkgs;
-    for my $change (@changes) {
-        my $size = $change->size;
-        for my $line (0..$change->size-1) {
-            my $text = $change->text($line);
-            next if $text =~ /^(?:Line-Count|Last-Updated|Written-By)/;
-            my($module, $version, $dist) = split /\s+/, $text;
+    my $in_package;
+    for (split /\r?\n/, $diff) {
+        chomp;
+        if (m!^\+\+\+ b/02packages\.details\.txt!) {
+            $in_package = 1;
+            next;
+        } elsif (m!^\+\+\+ b/.*!) {
+            last;
+        }
+
+        if ($in_package) {
+            s/^\+// or next;
+            next if /^(?:Line-Count|Last-Updated|Written-By)/;
+            my($module, $version, $dist) = split /\s+/;
             $dists2pkgs{$dist} ||= {};
             $dists2pkgs{$dist}{$module} = $version;
             $code->($module, $version, $dist) if $code;
         }
     }
-
+    
     for my $dist (sort keys %dists2pkgs) {
         handle_update($dist, $dists2pkgs{$dist});
     }
@@ -115,11 +120,7 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
 sub handle_update {
     my($dist, $packages) = @_;
 
-    my $ext = CPAN::DistnameInfo->new($dist)->extension;
-    (my $file = $dist) =~ s/\Q$ext\E$/packages.json/;
-
-    my $metafile = $outdir->child("dists/$file");
-    $metafile->parent->mkpath;
-    warn "Writing $metafile\n";
-    $metafile->spew(JSON::encode_json({ pathname => $dist, packages => $packages }));
+    while (my($package, $version) = each %$packages) {
+        print "$package $version $dist\n";
+    }
 }
