@@ -69,19 +69,11 @@ if ($initial) {
 
     my %dists2pkgs;
     for (split /\n/, $text) {
-        chomp;
         if (/^$/) {
             $in_header = 0;
         } elsif (!$in_header) {
-            my($module, $version, $dist) = split /\s+/, $_;
-            $dists2pkgs{$dist} ||= {};
-            $dists2pkgs{$dist}{$module} = $version;
+            print $_, "\n";
         }
-    }
-
-    # NOTE This might have partial distribution information
-    for my $dist (sort keys %dists2pkgs) {
-        handle_update($dist, $dists2pkgs{$dist});
     }
 }
 
@@ -92,7 +84,6 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
     my %dists2pkgs;
     my $in_package;
     for (split /\r?\n/, $diff) {
-        chomp;
         if (m!^\+\+\+ b/02packages\.details\.txt!) {
             $in_package = 1;
             next;
@@ -103,24 +94,9 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
         if ($in_package) {
             s/^\+// or next;
             next if /^(?:Line-Count|Last-Updated|Written-By)/;
-            my($module, $version, $dist) = split /\s+/;
-            $dists2pkgs{$dist} ||= {};
-            $dists2pkgs{$dist}{$module} = $version;
-            $code->($module, $version, $dist) if $code;
+            print $_, "\n";
         }
-    }
-    
-    for my $dist (sort keys %dists2pkgs) {
-        handle_update($dist, $dists2pkgs{$dist});
     }
 
     $state->spew($rev);
-}
-
-sub handle_update {
-    my($dist, $packages) = @_;
-
-    while (my($package, $version) = each %$packages) {
-        print "$package $version $dist\n";
-    }
 }

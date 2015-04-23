@@ -9,8 +9,8 @@ my $reqs = CPAN::Meta::Requirements->from_string_hash({ $module => $want_version
 
 open my $fh, '<', 'packages.txt' or die $!;
 while (<$fh>) {
-    if (/^$module /o) {
-        my($module, $version, $distfile) = split / /;
+    if (/^$module\s/o) {
+        my($module, $version, $distfile) = split /\s+/;
         if ($reqs->accepts_module($module, $version)) {
             warn $_;
         }
