@@ -42,15 +42,10 @@ my $clean = 1;
 END { rmdir $lock if $clean }
 
 my $outdir = Path::Tiny->cwd;
-my $code;
-GetOptions("outdir|o=s", sub { $outdir = Path::Tiny->new($_[1]) }, "e=s", \$code);
-
+GetOptions("o=s", sub { $outdir = Path::Tiny->new($_[1]) });
 $outdir->mkpath;
 
-if ($code) {
-    $code = eval "sub { $code }";
-    die $@ if $@;
-}
+my $fh = $outdir->child('packages.txt')->filehandle('>>');
 
 my $state = $outdir->child(".rev-state");
 $state->touch unless $state->exists;
@@ -72,7 +67,7 @@ if ($initial) {
         if (/^$/) {
             $in_header = 0;
         } elsif (!$in_header) {
-            print $_, "\n";
+            print $fh $_, "\n";
         }
     }
 }
@@ -93,8 +88,9 @@ for my $rev (reverse $checkout->git("log $current.. --format=%H")) {
 
         if ($in_package) {
             s/^\+// or next;
+            warn $_, "\n" if /^Last-Updated/;
             next if /^(?:Line-Count|Last-Updated|Written-By)/;
-            print $_, "\n";
+            print $fh $_, "\n";
         }
     }
 
